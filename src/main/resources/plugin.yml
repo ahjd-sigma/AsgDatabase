@@ -3,3 +3,16 @@ version: '1'
 main: ahjd.asgDatabase.AsgDatabase
 api-version: '1.21'
 authors: [ ahjd ]
+description: A pure SQLite database plugin for plugin-to-database communication without player listeners
+
+commands:
+  asgdb:
+    description: AsgDatabase admin commands
+    usage: /asgdb <help|info|list|view|delete>
+    permission: asgdatabase.admin
+    aliases: [asgdatabase, db]
+
+permissions:
+  asgdatabase.admin:
+    description: Allows access to all AsgDatabase admin commands
+    default: op
