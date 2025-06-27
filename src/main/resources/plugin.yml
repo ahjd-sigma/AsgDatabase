@@ -1,0 +1,5 @@
+name: AsgDatabase
+version: '1'
+main: ahjd.asgDatabase.AsgDatabase
+api-version: '1.21'
+authors: [ ahjd ]
