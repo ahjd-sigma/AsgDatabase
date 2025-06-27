@@ -1,154 +1,169 @@
 # AsgDatabase
 
-A Spigot plugin that provides a centralized SQLite database for plugin-to-database communication, allowing plugins to store and retrieve data.
-
-## Features
-
-- SQLite database for persistent data storage
-- API for other plugins to store and retrieve data
-- Support for player-specific data (UUID-based)
-- Support for global plugin data
-- Simple and easy-to-use interface
-- Pure database functionality with no player listeners
-
-## Installation
-
-1. Download the latest release from the releases page
-2. Place the JAR file in your server's `plugins` folder
-3. Restart your server
+This project provides a robust and flexible database API for Bukkit/Spigot plugins, built on SQLite. It offers functionalities for universal data storage, object serialization, and a tagging system, along with convenience methods for common Minecraft-related data.
 
 ## API Usage
 
 ### Accessing the API
 
-There are two ways to access the AsgDatabase API:
-
-#### Method 1: Using Bukkit ServicesManager
+To use the `DatabaseAPI` in your plugin, you can access it via Bukkit's ServicesManager:
 
 ```java
-DatabaseAPI databaseAPI = getServer().getServicesManager().getRegistration(DatabaseAPI.class).getProvider();
-```
+import ahjd.asgDatabase.DatabaseAPI;
+import org.bukkit.Bukkit;
 
-#### Method 2: Direct Plugin Access
+// In your plugin's onEnable() method or where you need to access the API
+DatabaseAPI databaseAPI = Bukkit.getServer().getServicesManager().getRegistration(DatabaseAPI.class).getProvider();
 
-```java
-AsgDatabase asgDatabase = (AsgDatabase) getServer().getPluginManager().getPlugin("AsgDatabase");
-DatabaseAPI databaseAPI = asgDatabase.getDatabaseAPI();
-```
-
-### Saving Player Data
-
-```java
-UUID playerUUID = player.getUniqueId();
-String yourPluginName = "YourPluginName";
-
-Map<String, Object> data = new HashMap<>();
-data.put("points", 100);
-data.put("level", 5);
-data.put("lastLogin", System.currentTimeMillis());
-
-databaseAPI.savePlayerData(playerUUID, yourPluginName, data);
-```
-
-### Retrieving Player Data
-
-```java
-UUID playerUUID = player.getUniqueId();
-String yourPluginName = "YourPluginName";
-
-Map<String, Object> data = databaseAPI.getPlayerData(playerUUID, yourPluginName);
-if (data != null) {
-    int points = Integer.parseInt(data.get("points").toString());
-    int level = Integer.parseInt(data.get("level").toString());
-    long lastLogin = Long.parseLong(data.get("lastLogin").toString());
-    
-    // Use the data in your plugin
+if (databaseAPI == null) {
+    // Handle case where API is not available
+    getLogger().severe("AsgDatabase API not found!");
+    return;
 }
 ```
 
-### Checking if Player Data Exists
+### Universal Data Storage
+
+The API allows you to store and retrieve various types of data using a key-value pair system, with automatic type detection and conversion.
+
+**Storing Data:**
 
 ```java
-boolean hasData = databaseAPI.hasPlayerData(playerUUID, yourPluginName);
+// Store a simple value
+databaseAPI.storeData("player_data", player.getUniqueId().toString(), "coins", 1000);
+
+// Store data with metadata
+databaseAPI.storeData("player_data", player.getUniqueId().toString(), "last_login", System.currentTimeMillis(), "timestamp");
+
+// Store multiple data points in a batch
+Map<String, Object> playerStats = new HashMap<>();
+playerStats.put("kills", 50);
+playerStats.put("deaths", 10);
+databaseAPI.storeDataBatch("player_stats", player.getUniqueId().toString(), playerStats);
 ```
 
-### Deleting Player Data
+**Retrieving Data:**
 
 ```java
-databaseAPI.deletePlayerData(playerUUID, yourPluginName);
+// Retrieve a specific data point with type conversion
+Integer coins = databaseAPI.getData("player_data", player.getUniqueId().toString(), "coins", Integer.class);
+
+// Retrieve all data for a specific type and identifier
+Map<String, Object> stats = databaseAPI.getAllData("player_stats", player.getUniqueId().toString());
 ```
 
-### Saving Global Plugin Data
+### Object Storage
+
+Store and retrieve complex Java objects, which are automatically serialized to JSON.
+
+**Storing Objects:**
 
 ```java
-databaseAPI.saveGlobalData(yourPluginName, "serverName", "Awesome Server");
-databaseAPI.saveGlobalData(yourPluginName, "maxPlayers", 100);
+public class PlayerSettings {
+    public boolean chatEnabled = true;
+    public String theme = "dark";
+}
+
+PlayerSettings settings = new PlayerSettings();
+databaseAPI.storeObject("player_settings", player.getUniqueId().toString(), settings);
 ```
 
-### Retrieving Global Plugin Data
+**Retrieving Objects:**
 
 ```java
-String serverName = (String) databaseAPI.getGlobalData(yourPluginName, "serverName");
-int maxPlayers = Integer.parseInt(databaseAPI.getGlobalData(yourPluginName, "maxPlayers").toString());
+PlayerSettings retrievedSettings = databaseAPI.getObject("player_settings", player.getUniqueId().toString(), PlayerSettings.class);
+
+// Get object as a generic Map for dynamic access
+Map<String, Object> settingsMap = databaseAPI.getObjectAsMap("player_settings", player.getUniqueId().toString());
 ```
 
-## Example Plugin
+### Tagging System
 
-Here's a simple example of a plugin that uses the AsgDatabase API:
+Apply tags to any data for flexible categorization and searching.
+
+**Adding Tags:**
 
 ```java
-public class ExamplePlugin extends JavaPlugin {
+// Add a tag with a value
+databaseAPI.addTag("item", "sword_of_power", "rarity", "legendary");
 
-    private DatabaseAPI databaseAPI;
+// Add a simple tag without a value
+databaseAPI.addTag("player", player.getUniqueId().toString(), "admin");
+```
 
-    @Override
-    public void onEnable() {
-        // Get the API from the services manager
-        databaseAPI = getServer().getServicesManager().getRegistration(DatabaseAPI.class).getProvider();
-        
-        if (databaseAPI == null) {
-            getLogger().severe("AsgDatabase plugin not found! Disabling plugin.");
-            getServer().getPluginManager().disablePlugin(this);
-            return;
-        }
-        
-        // Save some global plugin data
-        databaseAPI.saveGlobalData(getName(), "enableTime", System.currentTimeMillis());
-        
-        getLogger().info("ExamplePlugin has been enabled!");
+**Retrieving and Finding by Tags:**
+
+```java
+// Get all tags for a target
+Map<String, String> itemTags = databaseAPI.getTags("item", "sword_of_power");
+
+// Find all targets with a specific tag
+List<String> legendaryItems = databaseAPI.findByTag("item", "rarity", "legendary");
+```
+
+### Convenience Methods
+
+The API includes specific methods for common Minecraft data types:
+
+```java
+// Store player data
+databaseAPI.storePlayerData(player, "economy", Map.of("balance", 500.0));
+
+// Store entity data (e.g., custom mobs)
+databaseAPI.storeEntityData(entity, Map.of("health", 100, "level", 5));
+
+// Store hologram data
+List<String> lines = Arrays.asList("Hello World", "This is a hologram");
+Map<String, Object> properties = Map.of("display_time", 60);
+databaseAPI.storeHologramData("welcome_hologram", player.getLocation(), lines, properties);
+```
+
+### Deleting Data
+
+```java
+// Delete all data for a specific type and identifier
+databaseAPI.deleteData("player_data", player.getUniqueId().toString());
+
+// Delete a specific data key
+databaseAPI.deleteDataKey("player_data", player.getUniqueId().toString(), "coins");
+```
+
+### Custom SQL Execution
+
+For advanced use cases, you can execute raw SQL queries:
+
+```java
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+try {
+    ResultSet rs = databaseAPI.executeQuery("SELECT * FROM data_storage WHERE data_type = ?", "player_data");
+    while (rs.next()) {
+        System.out.println(rs.getString("data_key") + ": " + rs.getString("data_value"));
     }
-    
-    @Override
-    public void onDisable() {
-        // Save disable time
-        if (databaseAPI != null) {
-            databaseAPI.saveGlobalData(getName(), "disableTime", System.currentTimeMillis());
-        }
-    }
-    
-    // Example method to save player data when needed
-    public void savePlayerStats(Player player, int points, int level) {
-        UUID uuid = player.getUniqueId();
-        
-        Map<String, Object> data = new HashMap<>();
-        data.put("points", points);
-        data.put("level", level);
-        data.put("lastUpdate", System.currentTimeMillis());
-        
-        databaseAPI.savePlayerData(uuid, getName(), data);
-    }
-    
-    // Example method to get player data when needed
-    public Map<String, Object> getPlayerStats(UUID uuid) {
-        return databaseAPI.getPlayerData(uuid, getName());
-    }
-    
-    public DatabaseAPI getDatabaseAPI() {
-        return databaseAPI;
-    }
+} catch (SQLException e) {
+    e.printStackTrace();
+}
+
+try {
+    int affectedRows = databaseAPI.executeUpdate("DELETE FROM data_storage WHERE data_type = ?", "old_data");
+    System.out.println("Rows affected: " + affectedRows);
+} catch (SQLException e) {
+    e.printStackTrace();
 }
 ```
 
-## License
+## Installation
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+1. Add the plugin as a dependency to your project.
+2. Ensure your `plugin.yml` includes a `depend` or `softdepend` entry for `AsgDatabase` if it's a separate plugin.
+
+## Building from Source
+
+To build the project, navigate to the root directory and run:
+
+```bash
+mvn clean install
+```
+
+This will generate a JAR file in the `target/` directory.
